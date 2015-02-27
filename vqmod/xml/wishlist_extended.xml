@@ -1,0 +1,2427 @@
+<modification>
+	<id>Wish List Advanced</id>
+	<version>2.0</version>
+	<vqmver>2.5.1</vqmver>
+	<author>Opencart Vqmods | Avvici</author>
+
+	<file name="admin/controller/extension/module.php">
+		<operation>
+			<search position="after"><![CDATA[
+			$this->model_extension_extension->install('module', $this->request->get['extension']);
+            ]]></search>
+
+			<add trim="true"><![CDATA[
+       if($this->request->get['extension'] === "wishlist"){
+		//DO NOT ALTER THIS CODE. WARNING.
+        //RUN SQL HERE
+        //Update customer table with field
+        $fields = $this->db->query('SHOW COLUMNS FROM `' . DB_PREFIX . 'customer`');
+
+        $columns = $fields->num_rows;
+        $field_array = array();
+        foreach ($fields->rows as $row) {
+
+            $field_array[] = $row['Field'];
+
+        }
+
+        if (!in_array('wishlist_show', $field_array)) {
+           $this->db->query('ALTER TABLE `' . DB_PREFIX . 'customer` ADD `wishlist_show` tinyint (1) DEFAULT 0 NOT NULL AFTER customer_id');
+        }
+        if (!in_array('wishlist_old', $field_array)) {
+           $this->db->query('ALTER TABLE `' . DB_PREFIX . 'customer` ADD `wishlist_old` tinyint (1) DEFAULT 1 NOT NULL AFTER customer_id');
+        }
+
+
+        $this->db->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . "wishlist_multiple` (
+   `list_id` int(7) unsigned NOT NULL auto_increment,
+   `customer_id` int(11) NOT NULL,
+   `list_category_id` tinyint(1) NOT NULL,
+   `list_name` varchar(75) NOT NULL,
+   `list_contents` text NOT NULL,
+   `date_created` datetime NOT NULL,
+   `date_modified` datetime NOT NULL,
+     PRIMARY KEY  (`list_id`)
+   ) ENGINE=MyISAM  DEFAULT CHARSET=utf8");
+
+        $this->db->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . "wishlist_categories` (
+   `category_id` int(3) unsigned NOT NULL auto_increment,
+   `category_name` varchar(50) NOT NULL,
+   `customer_id` int(11) NOT NULL,
+   `date_created` datetime NOT NULL,
+   `date_modified` datetime NOT NULL,
+    `sort_order` int(5) NOT NULL,
+     PRIMARY KEY  (`category_id`)
+   ) ENGINE=MyISAM  DEFAULT CHARSET=utf8");
+
+}
+			    ]]></add>
+		</operation>
+		<operation>
+			<search position="after"><![CDATA[
+			$this->model_extension_extension->uninstall('module', $this->request->get['extension']);
+            ]]></search>
+
+			<add trim="true"><![CDATA[
+
+			  //DO NOT ALTER THIS CODE. WARNING.
+			  //Remove tables and extra fields here
+			  if($this->request->get['extension'] === "wishlist"){
+       //$this->db->query('DROP TABLE `' . DB_PREFIX . 'wishlist_categories`');
+        $this->db->query('DROP TABLE `' . DB_PREFIX . 'wishlist_multiple`');
+        $this->db->query('ALTER TABLE `' . DB_PREFIX . 'customer` DROP `wishlist_old`');
+         $this->db->query('ALTER TABLE `' . DB_PREFIX . 'customer` DROP `wishlist_show`');
+
+}
+
+			    ]]></add>
+		</operation>
+	</file>
+	<file name="catalog/controller/common/header.php">
+		<operation>
+			<search position="replace"><![CDATA[
+				      $data['text_wishlist'] = sprintf($this->language->get('text_wishlist'), (isset($this->session->data['wishlist']) ? count($this->session->data['wishlist']) : 0));
+			]]>
+			</search>
+			<add><![CDATA[
+						if ($this->customer->isLogged()) {  
+				$list_count = $this->db->query("SELECT list_contents FROM `" . DB_PREFIX . "wishlist_multiple` WHERE customer_id = '".(int)$this->customer->getId()."'");
+	            if($list_count){
+				$counter = 0;
+				foreach($list_count->rows as $list){
+				
+				$list = unserialize($list['list_contents']);
+				if(!empty($list)){
+				foreach($list as  $value){
+				$counter += $value;
+				
+				}
+				}else{
+				$counter = 0;
+				}				
+				
+				}
+				
+				$data['text_wishlist'] = sprintf($this->language->get('text_wishlist') ,  $counter);
+				
+				}else{
+				
+				$data['text_wishlist'] = sprintf($this->language->get('text_wishlist') ,  0);
+				}
+				
+				
+				}else{
+				$data['text_wishlist'] = sprintf($this->language->get('text_wishlist'), (isset($this->session->data['wishlistqueue']) ? count($this->session->data['wishlistqueue']) : 0));
+				}		
+				]]></add>
+
+		</operation>
+	</file>
+
+
+	<file name="catalog/controller/product/category.php">
+		<operation>
+			<search position="after"><![CDATA[
+				public function index() { 
+			]]>
+			</search>
+			<add><![CDATA[
+    $this->document->addStyle('catalog/view/javascript/jquery/colorbox/colorbox.css');
+  $this->document->addScript('catalog/view/javascript/jquery/colorbox/jquery.colorbox-min.js');
+
+	$this->load->language('account/wishlist');
+		$this->data['cat_name'] = $this->language->get('cat_name');
+		$this->data['sort'] = $this->language->get('sort');
+		$this->data['new_list'] = $this->language->get('new_list');
+		$this->data['save_list_to'] = $this->language->get('save_list_to');
+		$this->data['save_list'] = $this->language->get('save_list');
+		$this->data['save_cat'] = $this->language->get('save_cat');
+		$this->data['list_title'] = $this->language->get('list_name');
+		$this->data['remove_list'] = $this->language->get('remove_list');
+		$this->data['noavailable_list'] = $this->language->get('noavailable_list');
+		$this->data['wishlists'] = $this->language->get('wishlists');
+		$this->data['remove'] = $this->language->get('remove');
+		$this->data['nocats'] = $this->language->get('nocats');
+		$this->data['nowishlists'] = $this->language->get('nowishlists');
+		$this->data['new_cat'] = $this->language->get('new_cat');
+		$this->data['nocats2'] = $this->language->get('nocats2');
+		$this->data['nowishlists2'] = $this->language->get('nowishlists2');
+		$this->data['choose'] = $this->language->get('choose');
+		$this->data['queuelist'] = $this->language->get('queuelist');
+		$this->data['createsave'] = $this->language->get('createsave');
+		$this->data['currently'] = $this->language->get('currently');
+		$this->data['empty'] = $this->language->get('empty');
+		$this->data['doso'] = $this->language->get('doso');
+		$this->data['or'] = $this->language->get('or');
+	 if (isset($this->session->data['success'])) {
+			$this->data['success'] = $this->session->data['success'];
+			unset($this->session->data['success']);
+		} else {
+			$this->data['success'] = '';
+		}	
+		//gather categories
+			$this->data['listcategories'] = array();
+			$list_count = $this->db->query("SELECT list_contents  FROM `" . DB_PREFIX . "wishlist_multiple` WHERE customer_id = '".(int)$this->customer->getId()."'");
+				if(!$list_count->num_rows){
+				  $this->data['list_count'] = false;
+
+				}else{
+				 $this->data['list_count'] = true;
+				}
+			$wishcategories = $this->db->query("SELECT category_id,category_name FROM `" . DB_PREFIX . "wishlist_categories` WHERE customer_id = '".(int)$this->customer->getId()."' ORDER BY sort_order ASC");
+			if(!$wishcategories ){
+				$this->data['listcategories'] = false;
+			}else{
+			$wishlists = array();
+			
+				foreach($wishcategories->rows as $cat){
+				$lists = $this->db->query("SELECT list_name,list_id FROM `" . DB_PREFIX . "wishlist_multiple` WHERE	list_category_id = '".(int)$cat['category_id']."' AND customer_id = '".(int)$this->customer->getId()."' ORDER BY list_id ASC");
+				$list_count = $this->db->query("SELECT COUNT(*) AS total FROM `" . DB_PREFIX . "wishlist_multiple` WHERE list_category_id = '".(int)$cat['category_id']."'");
+	            $count = $list_count->row['total'];
+				if($lists){
+				$wishlists = $lists->rows;
+				}else{
+				$wishlists = array();
+				}
+					$this->data['listcategories'][] = array('category_id' => $cat['category_id'],'category_name' => $cat['category_name'],'lists' => $wishlists,'count' => $count);
+					
+				}
+				
+			}	
+					
+		
+		]]></add>
+
+		</operation>
+
+		<operation>
+			<search position="after" index="1"><![CDATA[
+             if (isset($this->request->get['path'])) {
+            ]]></search>
+			<add><![CDATA[
+		$this->data['catpath'] = $this->url->link('product/category', 'path=' . $this->request->get['path']);
+		
+            ]]></add>
+		</operation>
+	</file>
+	<file name="catalog/controller/account/login.php">
+		<operation>
+			<search position="before"><![CDATA[
+				$this->data['action'] = $this->url->link('account/login', '', 'SSL');
+			]]>
+			</search>
+			<add><![CDATA[
+		$this->data['wishlistsearch'] = $this->url->link('wishlist/shared_wishlist/search', '', 'SSL');
+		]]></add>
+
+		</operation>
+	</file>
+	<file name="catalog/view/theme/*/template/account/login.tpl">
+		<operation>
+			<search position="before"><![CDATA[
+				<?php echo $content_bottom; ?>
+			]]>
+			</search>
+			<add><![CDATA[
+						<?php if(isset($this->request->get['wishlist']) && $this->request->get['wishlist'] == "true"){?>
+						<form action="<?php echo $wishlistsearch; ?>" method="post" enctype="multipart/form-data">
+		 <div id="wish-search"><div class="left"><p><span style="font-size:16px; font-weight:bold;">Find A Wish list</span><br>Enter the following information about your friend or family member:</p>
+		 <table><tr><td><strong>Name or E-mail:</strong></td><td align="left"> <input type="text" value="" name="nameoremail"></td></tr><tr><td> <strong>Town or City:</strong> <small>(optional)</small></td> <td align="left"><input type="text" value="" name="townorcity"></td></tr>
+		 <tr><td><input type="submit" value="Search" class="btn btn-primary" /></td></tr></table>
+		 </div></div></form><?php }?>
+		 <script type="text/javascript"><!--
+$('#wish-search input').keydown(function(e) {
+	if (e.keyCode == 13) {
+		$('#wish-search').submit();
+	}
+});
+//--></script> 
+		]]></add>
+
+		</operation>
+	</file>
+	<file name="catalog/view/theme/*/template/product/category.tpl">
+		<operation>
+			<search position="before"><![CDATA[<div class="breadcrumb">]]></search>
+			<add><![CDATA[<?php if ($success) { ?>
+<div class="success"><?php echo $success; ?><img src="catalog/view/theme/default/image/close.png" alt="" class="close" /></div>
+<?php } ?>
+	
+]]></add>
+		</operation>
+		<operation>
+			<search position="replace">
+				<![CDATA[<a onclick="addToWishList('<?php echo $product['product_id']; ?>');">]]></search>
+			<add><![CDATA[
+	<a onclick="addToWishMultipleList('<?php echo $product['product_id']; ?>');">
+
+]]></add>
+
+		</operation>
+		<operation>
+			<search position="before"><![CDATA[<div class="pagination">]]></search>
+			<add><![CDATA[
+						
+						 <div style='display:none'>
+		<div id='inline-content-3' style='padding:10px; background:#fff;height:400px;overflow:auto;'>
+
+			<div id="choose">
+		
+
+			<div style="float:left; margin-right:20px;">
+			<h2><?php echo $choose;?></h2>
+						 <?php if($listcategories){?>
+						 <?php foreach($listcategories as $category){?>
+						<select id = "list_<?php echo $category['category_id'];?>" name = "<?php echo $category['category_id'];?>" onChange="assignList(<?php echo $category['category_id'];?>);">
+						 <option value="" selected><?php echo $category['category_name'];?> (<?php echo $category['count'];?>)</option>
+						 
+						 <optgroup label="<?php if($category['count'] == 0){ echo $noavailable_list; }else{ echo $wishlists;}?>">
+						 <?php if($category['lists']){?>
+						 <?php foreach($category['lists'] as $list){?>
+						  <option value="<?php echo $list['list_id'];?>"><?php echo $list['list_name'];?></option>
+						   <?php }?>
+						 <?php }?>
+						  </optgroup>
+						 </select><br><br>
+						  <?php }?>
+						</div><div style="float:left; margin-right:20px;"><?php echo $or;?></div><div style="float:left;">
+						  <h2><?php echo $createsave;?></h2>
+						<?php echo $list_title;?> <input type="text" name="name" value="" /><br><br>
+			           <?php echo $save_list_to;?><br>
+			 <?php foreach($listcategories as $category){?>
+						  <input type="radio" name="categoryname" id="<?php echo $category['category_name'];?>" value="<?php echo $category['category_id'];?>">	<label for="<?php echo $category['category_name'];?>"><?php echo $category['category_name'];?></label><br><br>
+						   <?php }?>
+						 <a onClick="savenewlist();" class="btn btn-primary"><?php echo $save_list;?></a>
+						</div>
+						 <?php }else{?>
+						<p style="color:#900;">  <?php echo $nowishlists;?> </p>
+						 <div id="wishlistlogin"></div>
+												   <div style="height:20px;margin-bottom:10px;margin-top:10px;"><?php echo $doso;?></div>	
+
+						 <?php }?>
+						  <?php if(!$list_count){?>
+						<p style="color:#900;">   <?php echo $nowishlists2;?> </p>
+						
+						 <?php }?>
+						
+			</div>
+</div></div>
+
+]]></add>
+
+		</operation>
+
+		<operation>
+			<search position="before"><![CDATA[<?php echo $footer; ?>]]></search>
+			<add><![CDATA[
+						<script type="text/javascript"><!--
+
+function savenewlist(){
+			$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/addNewListAndAssign&catpath='+encodeURIComponent("<?php echo $catpath;?>"),
+		data: $('#choose input[type=\'text\'],#choose input[type=\'radio\']:checked'),
+		dataType: 'json',
+		beforeSend: function() {
+			$('#choose').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			var loc =  convert(json['success']);
+			location = loc;
+					
+		   }
+		}
+	});	
+		
+		}		
+function assignList(catid){
+			
+				$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/assignToList&catpath='+encodeURIComponent("<?php echo $catpath;?>")+'&listid='+$('#list_'+catid).val(),	
+		dataType: 'json',
+		beforeSend: function() {
+			$('#list_'+catid).before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			var loc =  convert(json['success']);
+			location = loc;
+				
+					
+		   }
+		}
+	});	
+	}
+	function convert(str)
+{
+  str = str.replace(/&amp;/g, "&");
+ 
+  return str;
+}
+function createTemporaryList(){
+$.ajax({
+		url: 'index.php?route=wishlist/shared_wishlist/getTemporaryList',
+		type: 'post',
+		dataType: 'json',
+		beforeSend: function() {
+			$('#choose').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(products) {
+			$('.success, .warning, .attention, .information').remove();
+			var pdata = '';
+			for (i = 0; i < products.length; i++) {
+			
+			pdata += '<div style="padding:10px;float:left;">' + products[i]['name'] +'<br>';
+			pdata +=  products[i]['price'] +'<br>';
+			pdata +=  products[i]['stock'] +'<br>';
+			pdata += '<img src="'+products[i]['thumb']+'">';
+			pdata += '</div>';
+			
+			}
+			pdata += '<div style="clear:left;"></div>';
+			$('#wishlistlogin').prepend(pdata);	
+		
+		}
+	});
+
+
+}
+	function addToWishMultipleList(product_id) {
+	
+
+	
+	<?php if (!$this->customer->isLogged()) {?>
+	
+$(document).ready(function() {
+	$.colorbox({ width:"50%", inline:true, href:"#inline-content-3"});
+	});
+	$.ajax({
+		url: 'index.php?route=account/wishlist/add',
+		type: 'post',
+		data: 'product_id=' + product_id,
+		dataType: 'json',
+		success: function(json) {
+			$('.success, .warning, .attention, .information').remove();
+						
+			if (json['success']) {
+			  
+				$('#wishlist-total').html(json['total']);	
+                 $('#wishlistlogin').html(json['success']);	
+				  createTemporaryList();	
+			}	
+		}
+	});
+	<?php }else{?>
+	$.colorbox({ width:"30%", inline:true, href:"#inline-content-3"});
+	$.ajax({
+		url: 'index.php?route=account/wishlist/add',
+		type: 'post',
+		data: 'product_id=' + product_id,
+		dataType: 'json',
+		success: function(json) {
+			$('.success, .warning, .attention, .information').remove();
+						
+			if (json['success']) {
+				
+				$('#wishlist-total').html(json['total']);	
+	
+				
+			}	
+		}
+	});
+	<?php }?>
+}
+//--></script> 
+]]></add>
+		</operation>
+
+	</file>
+	<file name="system/library/customer.php">
+		<operation>
+			<search position="replace"><![CDATA[$this->db->query("UPDATE " . DB_PREFIX . "customer SET cart = '" . $this->db->escape(isset($this->session->data['cart']) ? serialize($this->session->data['cart']) : '') . "', wishlist = '" . $this->db->escape(isset($this->session->data['wishlist']) ? serialize($this->session->data['wishlist']) : '') . "', ip = '" . $this->db->escape($this->request->server['REMOTE_ADDR']) . "' WHERE customer_id = '" . (int)$this->customer_id . "'");
+]]></search>
+
+			<add>
+				<![CDATA[ $this->db->query("UPDATE " . DB_PREFIX . "customer SET cart = '" . $this->db->escape(isset($this->session->data['cart']) ? serialize($this->session->data['cart']) : '') . "', ip = '" . $this->db->escape($this->request->server['REMOTE_ADDR']) . "' WHERE customer_id = '" . (int)$this->customer_id . "'");  ]]></add>
+
+		</operation>
+	</file>
+
+	<file name="catalog/controller/account/wishlist.php" trim="true">
+
+		<operation>
+			<search position="replace">
+				<![CDATA[$data['heading_title'] = $this->language->get('heading_title');]]></search>
+
+			<add><![CDATA[
+						
+						$data['heading_title'] = $this->language->get('heading_title_new');
+		]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA['text' => $this->language->get('heading_title'),]]></search>
+
+			<add><![CDATA[
+						
+						'text' => $this->language->get('heading_title_new'),
+		]]></add>
+		</operation>
+		<operation>
+			<search position="replace">
+				<![CDATA[$this->document->setTitle($this->language->get('heading_title'));]]></search>
+
+			<add><![CDATA[
+						
+						$this->document->setTitle($this->language->get('heading_title_new'));
+		]]></add>
+		</operation>
+
+
+		<operation>
+
+			<search position="after"><![CDATA[public function index() {]]></search>
+
+			<add><![CDATA[
+		$this->document->addStyle('catalog/view/theme/default/stylesheet/wishlist.css');
+
+		$this->document->addStyle('catalog/view/javascript/jquery/magnific/magnific-popup.css');
+		$this->document->addScript('catalog/view/javascript/jquery/magnific/jquery.magnific-popup.min.js');
+
+			]]></add>
+		</operation>
+
+		<operation>
+
+			<search position="before"><![CDATA[public function index() {]]></search>
+
+			<add><![CDATA[
+						
+						private function getListItemOptions($product_id,$os){
+		
+		$option_data = array();
+		$pid = $product_id;
+					  if($os){
+					  $quantity = 1;
+					  $option_price = 0;
+				$option_points = 0;
+				$option_weight = 0;
+					 
+					 $options = array_filter($os);
+      			foreach ($options as $product_option_id => $option_value) {
+					$option_query = $this->db->query("SELECT po.product_option_id, po.option_id, od.name, o.type FROM `" . DB_PREFIX . "product_option` po LEFT JOIN `" . DB_PREFIX . "option` o ON (po.option_id = o.option_id) LEFT JOIN `" . DB_PREFIX . "option_description` od ON (o.option_id = od.option_id) WHERE po.product_option_id = '" . (int)$product_option_id . "' AND po.product_id = '" . (int)$pid . "' AND od.language_id = '" . (int)$this->config->get('config_language_id') . "'");
+					
+					if ($option_query->num_rows) {
+						if ($option_query->row['type'] == 'select' || $option_query->row['type'] == 'radio' || $option_query->row['type'] == 'image') {
+							$option_value_query = $this->db->query("SELECT pov.option_value_id, ovd.name, pov.quantity, pov.subtract, pov.price, pov.price_prefix, pov.points, pov.points_prefix, pov.weight, pov.weight_prefix FROM `" . DB_PREFIX . "product_option_value` pov LEFT JOIN `" . DB_PREFIX . "option_value` ov ON (pov.option_value_id = ov.option_value_id) LEFT JOIN " . DB_PREFIX . "option_value_description ovd ON (ov.option_value_id = ovd.option_value_id) WHERE pov.product_option_value_id = '" . (int)$option_value . "' AND pov.product_option_id = '" . (int)$product_option_id . "' AND ovd.language_id = '" . (int)$this->config->get('config_language_id') . "'");
+							
+							if ($option_value_query->num_rows) {
+								if ($option_value_query->row['price_prefix'] == '+') {
+									$option_price += $option_value_query->row['price'];
+								} elseif ($option_value_query->row['price_prefix'] == '-') {
+									$option_price -= $option_value_query->row['price'];
+								}
+
+								if ($option_value_query->row['points_prefix'] == '+') {
+									$option_points += $option_value_query->row['points'];
+								} elseif ($option_value_query->row['points_prefix'] == '-') {
+									$option_points -= $option_value_query->row['points'];
+								}
+															
+								if ($option_value_query->row['weight_prefix'] == '+') {
+									$option_weight += $option_value_query->row['weight'];
+								} elseif ($option_value_query->row['weight_prefix'] == '-') {
+									$option_weight -= $option_value_query->row['weight'];
+								}
+								
+								if ($option_value_query->row['subtract'] && (!$option_value_query->row['quantity'] || ($option_value_query->row['quantity'] < $quantity))) {
+									$stock = false;
+								}
+								
+								$option_data[] = array(
+									'product_option_id'       => $product_option_id,
+									'product_option_value_id' => $option_value,
+									'option_id'               => $option_query->row['option_id'],
+									'option_value_id'         => $option_value_query->row['option_value_id'],
+									'name'                    => $option_query->row['name'],
+									'option_value'            => $option_value_query->row['name'],
+									'type'                    => $option_query->row['type'],
+									'quantity'                => $option_value_query->row['quantity'],
+									'subtract'                => $option_value_query->row['subtract'],
+									'price'                   => $option_value_query->row['price'],
+									'price_prefix'            => $option_value_query->row['price_prefix'],
+									'points'                  => $option_value_query->row['points'],
+									'points_prefix'           => $option_value_query->row['points_prefix'],									
+									'weight'                  => $option_value_query->row['weight'],
+									'weight_prefix'           => $option_value_query->row['weight_prefix']
+								);								
+							}
+						} elseif ($option_query->row['type'] == 'checkbox' && is_array($option_value)) {
+							foreach ($option_value as $product_option_value_id) {
+								$option_value_query = $this->db->query("SELECT pov.option_value_id, ovd.name, pov.quantity, pov.subtract, pov.price, pov.price_prefix, pov.points, pov.points_prefix, pov.weight, pov.weight_prefix FROM `" . DB_PREFIX . "product_option_value` pov LEFT JOIN `" . DB_PREFIX . "option_value` ov ON (pov.option_value_id = ov.option_value_id) LEFT JOIN `" . DB_PREFIX . "option_value_description` ovd ON (ov.option_value_id = ovd.option_value_id) WHERE pov.product_option_value_id = '" . (int)$product_option_value_id . "' AND pov.product_option_id = '" . (int)$product_option_id . "' AND ovd.language_id = '" . (int)$this->config->get('config_language_id') . "'");
+								
+								if ($option_value_query->num_rows) {
+									if ($option_value_query->row['price_prefix'] == '+') {
+										$option_price += $option_value_query->row['price'];
+									} elseif ($option_value_query->row['price_prefix'] == '-') {
+										$option_price -= $option_value_query->row['price'];
+									}
+
+									if ($option_value_query->row['points_prefix'] == '+') {
+										$option_points += $option_value_query->row['points'];
+									} elseif ($option_value_query->row['points_prefix'] == '-') {
+										$option_points -= $option_value_query->row['points'];
+									}
+																
+									if ($option_value_query->row['weight_prefix'] == '+') {
+										$option_weight += $option_value_query->row['weight'];
+									} elseif ($option_value_query->row['weight_prefix'] == '-') {
+										$option_weight -= $option_value_query->row['weight'];
+									}
+									
+									if ($option_value_query->row['subtract'] && (!$option_value_query->row['quantity'] || ($option_value_query->row['quantity'] < $quantity))) {
+										$stock = false;
+									}
+									
+									$option_data[] = array(
+										'product_option_id'       => $product_option_id,
+										'product_option_value_id' => $product_option_value_id,
+										'option_id'               => $option_query->row['option_id'],
+										'option_value_id'         => $option_value_query->row['option_value_id'],
+										'name'                    => $option_query->row['name'],
+										'option_value'            => $option_value_query->row['name'],
+										'type'                    => $option_query->row['type'],
+										'quantity'                => $option_value_query->row['quantity'],
+										'subtract'                => $option_value_query->row['subtract'],
+										'price'                   => $option_value_query->row['price'],
+										'price_prefix'            => $option_value_query->row['price_prefix'],
+										'points'                  => $option_value_query->row['points'],
+										'points_prefix'           => $option_value_query->row['points_prefix'],
+										'weight'                  => $option_value_query->row['weight'],
+										'weight_prefix'           => $option_value_query->row['weight_prefix']
+									);								
+								}
+							}						
+						} elseif ($option_query->row['type'] == 'text' || $option_query->row['type'] == 'textarea' || $option_query->row['type'] == 'file' || $option_query->row['type'] == 'date' || $option_query->row['type'] == 'datetime' || $option_query->row['type'] == 'time') {
+							$option_data[] = array(
+								'product_option_id'       => $product_option_id,
+								'product_option_value_id' => '',
+								'option_id'               => $option_query->row['option_id'],
+								'option_value_id'         => '',
+								'name'                    => $option_query->row['name'],
+								'option_value'            => $option_value,
+								'type'                    => $option_query->row['type'],
+								'quantity'                => '',
+								'subtract'                => '',
+								'price'                   => '',
+								'price_prefix'            => '',
+								'points'                  => '',
+								'points_prefix'           => '',								
+								'weight'                  => '',
+								'weight_prefix'           => ''
+							);						
+						}
+					}
+					
+      			} 
+				}
+		return $option_data;
+	}
+		]]></add>
+		</operation>
+		<operation>
+			<search position="before"><![CDATA[
+			 if (isset($this->request->get['remove'])) {
+			
+			
+			]]>
+			</search>
+			<add><![CDATA[
+	   if (isset($this->request->get['removeitem'])) {
+	   
+	    $list = $this->db->query("SELECT list_contents FROM `" . DB_PREFIX . "wishlist_multiple`  WHERE list_id = '".(int)$this->request->get['listid']."'");
+					  if ($list->row['list_contents'] && is_string($list->row['list_contents'])) {
+					  
+					  $newlist = unserialize($list->row['list_contents']);
+					  
+					   foreach ($newlist as $key => $q) {
+				
+				if($key == $this->request->get['mainkey']){
+				unset($newlist[$key]);
+			
+				}
+				}
+				
+				
+				
+			
+				
+			
+		 $this->db->query("UPDATE `" . DB_PREFIX . "wishlist_multiple` SET list_contents = '" . $this->db->escape(serialize($newlist)) ."' , date_modified= NOW() WHERE list_id = '" . (int)$this->request->get['listid'] . "'");
+		
+	}
+			$this->redirect($this->url->link('account/wishlist', 'list_id='.$this->request->get['listid'], 'SSL'));
+		}
+	  
+		]]></add>
+
+		</operation>
+		<operation>
+			<search position="before"><![CDATA[
+             $data['products'][] = array(
+            ]]></search>
+			<add><![CDATA[
+			 if(isset($this->request->get['list_id'])){
+			  $id = $this->request->get['list_id'];
+			   $data['id'] = $this->request->get['list_id'];
+			  
+			  }else{
+			   $max = $this->db->query("SELECT MAX(list_id) AS max FROM `" . DB_PREFIX . "wishlist_multiple` WHERE customer_id = '".(int)$this->customer->getId()."'");
+			   if($max){
+	           $id = $max->row['max'];
+			    $data['id'] = $max->row['max'];
+			   }else{
+			   $id = 0;
+			    $data['id'] = 0;
+			   }
+			  
+			   
+			  
+			  }
+		
+            ]]></add>
+
+		</operation>
+
+
+		<operation>
+			<search position="replace"><![CDATA[
+				foreach ($this->session->data['wishlist'] as $key => $product_id) {
+				
+			
+			]]>
+			</search>
+			<add><![CDATA[
+	  if(isset($this->request->get['list_id'])){
+			  $id = $this->request->get['list_id'];
+			  
+			  }else{
+			   $max = $this->db->query("SELECT MAX(list_id) AS max FROM `" . DB_PREFIX . "wishlist_multiple` WHERE customer_id = '".(int)$this->customer->getId()."'");
+			   if($max){
+	           $id = $max->row['max'];
+			    $data['id'] = $max->row['max'];
+			   }else{
+			   $id = 0;
+			    $data['id'] = 0;
+			   }
+			  
+			   
+			  			  }
+              $getlist = $this->db->query("SELECT list_contents FROM `" . DB_PREFIX . "wishlist_multiple` WHERE list_id = '".(int)$id."'");
+         
+		if($getlist && !empty($getlist->row['list_contents'])){	  
+		
+		$templist = unserialize($getlist->row['list_contents']);
+		if(!empty($templist)){
+		 foreach ($templist as $product_id => $quantity) {
+		 $product = explode(":" , $product_id);
+		  $pcheck = $this->db->query("SELECT product_id FROM `" . DB_PREFIX . "product` WHERE product_id = '".(int)$product[0]."'");
+		if(!$pcheck->num_rows){
+		unset($templist[$product[0]]);
+		  }
+		  }
+		 $this->db->query("UPDATE `" . DB_PREFIX . "wishlist_multiple` SET list_contents = '" . serialize($templist)."' WHERE list_id = '".(int)$id."'");
+	}
+	}
+			
+			$list_count = $this->db->query("SELECT COUNT(*) AS total FROM `" . DB_PREFIX . "wishlist_multiple` WHERE list_id = '".(int)$id."'");
+	            $count = $list_count->row['total'];
+				if($count > 0){
+	 	  $list = $this->db->query("SELECT * FROM `" . DB_PREFIX . "wishlist_multiple` wm  LEFT JOIN `" . DB_PREFIX . "wishlist_categories` wc  ON (wm.list_category_id = wc.category_id) WHERE wm.list_id = '".(int)$id."'");
+
+		if($list){
+		$wishlist = unserialize($list->row['list_contents']);
+		
+		  
+		$data['list_name'] = $list->row['list_name'];
+		$data['category_name'] = $list->row['category_name'];
+		}else{
+		$data['list_name'] = false;
+		}
+		if($wishlist){
+		  $data['listempty'] = false;
+		 
+		 
+		foreach ($wishlist as $product_id => $quantity) {
+		$mainkey = $product_id;
+		$product = explode(':', $product_id);
+		$product_id = $product[0];
+		if (isset($product[1])) {
+					$options = unserialize(base64_decode($product[1]));
+				} else {
+					$options = array();
+				} 
+		
+		]]></add>
+
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[
+			unset($this->session->data['wishlist'][$key]);
+			
+			]]>
+			</search>
+			<add><![CDATA[
+	 
+	//unset($this->session->data['wishlist'][$key]);
+	
+	  
+		]]></add>
+
+		</operation>
+
+		<operation>
+			<search position="before"><![CDATA[
+			$data['continue'] = $this->url->link('account/account', '', 'SSL');
+			
+			]]>
+			</search>
+			<add><![CDATA[
+	  }else{
+	   $data['listempty'] = true;
+	  }
+	  }else{
+	  $data['list_name'] = false;
+	    $data['listempty'] = true;
+	  }
+	  
+	  
+	  
+	
+		
+		]]></add>
+
+		</operation>
+		<operation>
+			<search position="after" index="2"><![CDATA[
+if ($product_info) {
+            ]]></search>
+			<add><![CDATA[
+			if (!isset($this->session->data['wishlistqueue']) || isset($this->session->data['wishlistqueue'])) {
+			$this->session->data['wishlistqueue'] = array();
+		}
+		
+		if (!isset($this->request->post['option'])) {
+      		$key = (int)$this->request->post['product_id'];
+			
+    	} else {
+      		$key = (int)$this->request->post['product_id'] . ':' . base64_encode(serialize($this->request->post['option']));
+			
+    	}
+		$check = false;
+		$listcheck = $this->db->query("SELECT list_contents FROM `" . DB_PREFIX . "wishlist_multiple`");
+		if($listcheck){
+		 foreach ($listcheck->rows as $oldkey => $list) {
+					
+					  if ($list['list_contents'] && is_string($list['list_contents'])) {
+					 $newlist = unserialize($list['list_contents']);
+			
+				foreach($newlist as $oldkey => $quan){
+				
+				 if ($oldkey === $key){
+				$check = true;
+				$oldquan = (int)$quan;
+				}
+				}
+				}
+				
+				
+				
+				}
+		}
+		if(isset($this->request->post['quantity'])){
+		$quantity = $this->request->post['quantity'];
+		}else{
+		$quantity = 1;
+		}
+    	if ((int)$quantity && ((int)$quantity > 0)) {
+    		if (!$check) {
+      			$this->session->data['wishlistqueue'][$key] = (int)$quantity;
+    		} else {
+      			$this->session->data['wishlistqueue'][$key] += $oldquan + (int)$quantity;
+    		}
+		}else{
+		if (!$check) {
+      			$this->session->data['wishlistqueue'][$key] = 1;
+    		} else {
+      			$this->session->data['wishlistqueue'][$key] += $oldquan + 1;
+    		}
+		
+		}
+            ]]></add>
+
+		</operation>
+
+		<operation>
+			<search position="before" index="1"><![CDATA[
+				if (!isset($this->session->data['wishlist'])) {
+			
+			]]>
+			</search>
+			<add><![CDATA[ if (isset($this->session->data['wishlistqueue']) ) {
+			
+		$data['queue'] = true;
+		
+		}else{
+		
+		$data['queue'] = false;
+		}
+		
+		]]></add>
+
+
+		</operation>
+		<operation>
+			<search position="before" index="2"><![CDATA[
+				if (!isset($this->session->data['wishlist'])) {
+			
+			]]>
+			</search>
+			<add><![CDATA[
+	  
+	  if (!isset($this->session->data['wishlistqueue'])) {
+			$this->session->data['wishlistqueue'] = array();
+		}
+		
+		]]></add>
+
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[
+
+				$this->response->redirect($this->url->link('account/login', '', 'SSL'));
+
+			]]>
+			</search>
+			<add><![CDATA[
+
+            $this->response->redirect($this->url->link('account/login', 'wishlist=true', 'SSL'));
+
+		]]></add>
+
+		</operation>
+		<operation>
+			<search position="after" index="1"><![CDATA[$this->load->model('catalog/product');]]></search>
+			<add><![CDATA[
+		//check for old wish list items now
+		$olditems = $this->db->query("SELECT wishlist FROM `" . DB_PREFIX . "customer` WHERE customer_id = '".(int)$this->customer->getId()."' AND wishlist_old = '1'");
+		if(!empty($olditems->row['wishlist'])){
+		$old = unserialize($olditems->row['wishlist']);
+		if(!empty($old)){
+		$data['oldwish'] = true;
+		
+		$data['oldproducts'] = array();
+		foreach ($old as $product_id) {
+			$product_info = $this->model_catalog_product->getProduct($product_id);
+			if($product_info){
+			
+			$data['oldproducts'][] = array(
+					'product_id' => $product_info['product_id'],
+					'name'       => $product_info['name']
+					);
+			
+			}
+			}
+			}else{
+			$data['oldwish'] = false;
+			$data['oldproducts'] = array();
+			}
+		}else{
+		$data['oldwish'] = false;
+		$data['oldproducts'] = array();
+		}
+
+		//gather categories
+			$data['categories'] = array();
+			$list_count = $this->db->query("SELECT list_contents  FROM `" . DB_PREFIX . "wishlist_multiple` WHERE customer_id = '".(int)$this->customer->getId()."'");
+				if(!$list_count->num_rows){
+				  $data['list_count'] = false;
+				}else{
+				 $data['list_count'] = true;
+				}
+			$categories = $this->db->query("SELECT category_id,category_name FROM `" . DB_PREFIX . "wishlist_categories` WHERE customer_id = '".(int)$this->customer->getId()."' ORDER BY sort_order DESC");
+			if(!$categories ){
+				$data['categories'] = false;
+			}else{
+			$wishlists = array();
+			
+				foreach($categories->rows as $cat){
+				$lists = $this->db->query("SELECT list_name,list_id FROM `" . DB_PREFIX . "wishlist_multiple` WHERE	list_category_id = '".(int)$cat['category_id']."' AND customer_id = '".(int)$this->customer->getId()."' ORDER BY list_id ASC");
+				$list_count = $this->db->query("SELECT COUNT(*) AS total FROM `" . DB_PREFIX . "wishlist_multiple` WHERE list_category_id = '".(int)$cat['category_id']."'");
+	            $count = $list_count->row['total'];
+				if($lists){
+				$wishlists = $lists->rows;
+				}else{
+				$wishlists = array();
+				}
+					$data['categories'][] = array('category_id' => $cat['category_id'],'category_name' => $cat['category_name'],'lists' => $wishlists,'count' => $count);
+					
+				}
+				
+			}				
+		]]></add>
+		</operation>
+
+
+		<operation>
+			<search position="after" index="1"><![CDATA[
+if ($product_info) {
+            ]]></search>
+			<add><![CDATA[
+			$this->load->model('tool/image');
+		if ($product_info['image']) {
+				$popup = $this->model_tool_image->resize($product_info['image'], $this->config->get('config_image_popup_width'), $this->config->get('config_image_popup_height'));
+			} else {
+				$popup = '';
+			}	
+            ]]></add>
+		</operation>
+		<operation>
+			<search position="after"><![CDATA[
+$data['heading_title'] = $this->language->get('heading_title_new');
+            ]]></search>
+			<add><![CDATA[
+							
+		$data['text_trash'] = $this->language->get('text_trash');
+		$data['text_form_your_name'] = $this->language->get('text_form_your_name');
+		$data['text_form_recipient_name'] = $this->language->get('text_form_recipient_name');
+		$data['text_form_email'] = $this->language->get('text_form_email');
+		$data['text_form_message'] = $this->language->get('text_form_message');
+		$data['text_form_send'] = $this->language->get('text_form_send');
+		$data['text_form_close'] = $this->language->get('text_form_close');
+		$data['text_share_my_list'] = $this->language->get('text_share_my_list');
+		$data['text_instructions_right'] = $this->language->get('text_instructions_right');
+		$data['text_instructions_left'] = $this->language->get('text_instructions_left');
+		$data['text_print_my_list'] = $this->language->get('text_print_my_list');
+		$data['text_clear_my_list'] = $this->language->get('text_clear_my_list');
+		
+		
+		$data['cat_name'] = $this->language->get('cat_name');
+		$data['sort'] = $this->language->get('sort');
+		$data['new_list'] = $this->language->get('new_list');
+		$data['save_list_to'] = $this->language->get('save_list_to');
+		$data['save_list'] = $this->language->get('save_list');
+		$data['save_cat'] = $this->language->get('save_cat');
+		$data['list_title'] = $this->language->get('list_name');
+		$data['remove_list'] = $this->language->get('remove_list');
+		$data['noavailable_list'] = $this->language->get('noavailable_list');
+		$data['wishlists'] = $this->language->get('wishlists');
+		$data['remove'] = $this->language->get('remove');
+		$data['rename'] = $this->language->get('rename');
+		$data['nocats'] = $this->language->get('nocats');
+		$data['nowishlists'] = $this->language->get('nowishlists');
+		$data['new_cat'] = $this->language->get('new_cat');
+		$data['nocats2'] = $this->language->get('nocats2');
+		$data['nowishlists2'] = $this->language->get('nowishlists2');
+		$data['choose'] = $this->language->get('choose');
+		$data['queuelist'] = $this->language->get('queuelist');
+		$data['createsave'] = $this->language->get('createsave');
+		$data['currently'] = $this->language->get('currently');
+		$data['empty'] = $this->language->get('empty');
+		$data['doso'] = $this->language->get('doso');
+		$data['or'] = $this->language->get('or');
+		
+
+
+ if(isset($this->request->get['list_id'])){
+			  $id = $this->request->get['list_id'];
+			  }else{
+			   $max = $this->db->query("SELECT MAX(list_id) AS max FROM `" . DB_PREFIX . "wishlist_multiple` WHERE customer_id = '".(int)$this->customer->getId()."'");
+			   if($max){
+	           $id = $max->row['max'];
+			   }else{
+			   $id = 0;
+			    $this->data['id'] = 0;
+			   }
+			  
+			   
+			  
+			  }
+        $data['print'] = $this->url->link('wishlist/shared_wishlist/printWishlist', 'list_id='.$id, 'SSL');
+		$firstname = $this->customer->getFirstName();
+		if($firstname != ""){
+		$data['firstname'] = $firstname;
+		}else{
+		$data['firstname'] = '';
+
+		}
+     	$data['column_addremove'] = $this->language->get('column_addremove');
+		$data['column_share'] = $this->language->get('column_share');
+		$data['column_quantity'] = $this->language->get('column_quantity');
+		$data['share_message'] = $this->language->get('share_message');
+if(isset($this->request->get['list_id'])){
+			  $id = $this->request->get['list_id'];
+			  
+			  }else{
+			   $max = $this->db->query("SELECT MAX(list_id) AS max FROM `" . DB_PREFIX . "wishlist_multiple` WHERE customer_id = '".(int)$this->customer->getId()."'");
+			   if($max){
+	           $id = $max->row['max'];
+			   
+			   }else{
+			   $id = 0;
+			   
+			   }
+			  
+			   
+			  
+			  }
+		$data['share_link'] = $this->url->link('wishlist/shared_wishlist')  .'&listid=' . $id  . '&id=' . $this->customer->getId() . '&name=' . $this->customer->getFirstName();	            ]]></add>
+		</operation>
+		<operation>
+			<search position="replace">
+				<![CDATA['remove'     => $this->url->link('account/wishlist', 'remove=' . $product_info['product_id'])]]></search>
+			<add><![CDATA['remove'     => str_replace("amp;","",$this->url->link('account/wishlist', 'remove=' . $product_info['product_id']))
+		]]></add>
+		</operation>
+
+
+		<operation>
+			<search position="after"><![CDATA['thumb'      => $image,]]></search>
+			<add><![CDATA[
+						'quantity' => $quantity , 'popup'      => $popup,'options'      => $this->getListItemOptions($product_info['product_id'],$options), 'removeitem'     => $this->url->link('account/wishlist', 'removeitem=' . $product_info['product_id'].'&listid='.$id.'&mainkey='.$mainkey),'mainkey' => $mainkey,
+		]]></add>
+		</operation>
+
+
+	</file>
+
+
+	<file name="catalog/controller/account/edit.php">
+		<operation>
+			<search position="before">
+				<![CDATA[$this->redirect($this->url->link('account/account', '', 'SSL'));]]></search>
+			<add><![CDATA[
+			 $this->db->query("UPDATE `" . DB_PREFIX . "customer` SET wishlist_show = '" . (int)$this->request->post['showlist']."' WHERE customer_id = '".$this->customer->getId()."'");
+
+	
+]]></add>
+		</operation>
+		<operation>
+			<search position="after"><![CDATA[$data['breadcrumbs'] = array();]]></search>
+			<add><![CDATA[
+			
+			$show = $this->db->query("SELECT wishlist_show  FROM `" . DB_PREFIX . "customer` WHERE customer_id = '".$this->customer->getId()."'");
+                if($show){
+				$this->data['show'] = $show->row['wishlist_show'];
+				}else{
+				$this->data['show'] = '0';
+				}
+	
+]]></add>
+		</operation>
+
+	</file>
+
+	<file name="catalog/view/theme/*/template/account/edit.tpl">
+		<operation>
+			<search position="before"><![CDATA[<div class="buttons">]]></search>
+			<add><![CDATA[<p>Show my wish list to the public: Yes <input type="radio" name="showlist" <?php if($show == '1'){?>  checked <?php }?>value="1"> No <input type="radio" <?php if($show == '0'){?>  checked <?php }?> name="showlist" value="0"></p>
+	
+]]></add>
+		</operation>
+
+	</file>
+	<file name="catalog/view/theme/*/template/product/product.tpl">
+		<operation>
+			<search position="before"><![CDATA[<div class="breadcrumb">]]></search>
+			<add><![CDATA[<?php if ($success) { ?>
+<div class="success"><?php echo $success; ?><img src="catalog/view/theme/default/image/close.png" alt="" class="close" /></div>
+<?php } ?>
+	
+]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[<a onclick="addToWishList('<?php echo $product_id; ?>');">]]></search>
+			<add><![CDATA[
+	<a onclick="addToWishMultipleList();">
+
+]]></add>
+
+		</operation>
+
+
+		<operation>
+			<search position="before"><![CDATA[<?php echo $footer; ?>]]></search>
+			<add><![CDATA[
+						 <div style='display:none'>
+		<div id='inline-content-3' style='padding:10px; background:#fff;height:400px;overflow:auto;'>
+
+			<div id="choose">
+
+
+			
+						 <?php if($listcategories){?>
+						 <div style="float:left; margin-right:20px;">
+						 <h2><?php echo $choose;?></h2>
+						 <?php foreach($listcategories as $category){?>
+						<select id = "list_<?php echo $category['category_id'];?>" name = "<?php echo $category['category_id'];?>" onChange="assignList('<?php echo $category['category_id'];?>','<?php echo $product_id; ?>');">
+						 <option value="" selected><?php echo $category['category_name'];?> (<?php echo $category['count'];?>)</option>
+						 
+						 <optgroup label="<?php if($category['count'] == 0){ echo $noavailable_list; }else{ echo $wishlists;}?>">
+						 <?php if($category['lists']){?>
+						 <?php foreach($category['lists'] as $list){?>
+						  <option value="<?php echo $list['list_id'];?>"><?php echo $list['list_name'];?></option>
+						   <?php }?>
+						 <?php }?>
+						  </optgroup>
+						 </select><br><br>
+						  <?php }?>
+						</div>
+						<div style="float:left; margin-right:20px;">- OR -</div>
+						<div style="float:left;">
+						  <h2><?php echo $createsave;?></h2>
+						<?php echo $list_title;?> <input type="text" name="name" value="" /><br><br>
+			           <?php echo $save_list_to;?><br>
+			 <?php foreach($listcategories as $category){?>
+						  <input type="radio" name="categoryname" id="<?php echo $category['category_name'];?>" value="<?php echo $category['category_id'];?>">	<label for="<?php echo $category['category_name'];?>"><?php echo $category['category_name'];?></label><br><br>
+						   <?php }?>
+						 <a onClick="savenewlist('<?php echo $product_id; ?>');" class="btn btn-primary"><?php echo $save_list;?></a>
+						</div>
+						<div style="clear:left;"></div>
+						 <?php }else{?>
+						<p style="color:#900;">  <?php echo $nowishlists2;?> </p>
+						 <div id="wishlistlogin"></div>
+						   <div style="height:20px;margin-bottom:10px;margin-top:10px;"><?php echo $doso;?></div>	
+						 <?php }?>
+						  <?php if(!$list_count){?>
+						<p style="color:#900;">   <?php echo $nowishlists;?> </p>
+						
+						 <?php }?>
+			
+</div></div>
+</div>
+
+						<script type="text/javascript"><!--
+						function createTemporaryList(){
+$.ajax({
+		url: 'index.php?route=wishlist/shared_wishlist/getTemporaryList',
+		type: 'post',
+		dataType: 'json',
+		beforeSend: function() {
+			$('#choose').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(products) {
+			$('.success, .warning, .attention, .information').remove();
+			var pdata = '';
+			for (i = 0; i < products.length; i++) {
+			
+			pdata += '<div style="padding:10px;float:left;">' + products[i]['name'] +'<br>';
+			pdata += '<br><br>';
+			
+			pdata +=  products[i]['price'] +'<br>';
+			pdata +=  products[i]['stock'] +'<br>';
+			pdata += '<img src="'+products[i]['thumb']+'">';
+			pdata += '</div>';
+			
+			}
+			pdata += '<div style="clear:left;"></div>';
+			$('#wishlistlogin').prepend(pdata);	
+		
+		}
+	});
+
+
+}
+function savenewlist(product_id){
+			$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/addNewListAndAssign&product_id='+product_id+'&catpath='+encodeURIComponent("<?php echo $catpath;?>"),
+		data: $('#choose input[type=\'text\'],#choose input[type=\'radio\']:checked'),
+		dataType: 'json',
+		beforeSend: function() {
+			$('#choose').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			var loc =  convert(json['success']);
+			location = loc;
+					
+		   }
+		}
+	});	
+		
+		}		
+function assignList(catid,product_id){
+		
+				$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/assignToList&productid='+product_id+'&catpath='+encodeURIComponent("<?php echo $catpath;?>")+'&listid='+$('#list_'+catid).val(),	
+		dataType: 'json',
+		beforeSend: function() {
+			$('#list_'+catid).before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			var loc =  convert(json['success']);
+			location = loc;
+				
+					
+		   }
+		}
+	});	
+	}
+	function convert(str)
+{
+  str = str.replace(/&amp;/g, "&");
+ 
+  return str;
+}
+
+
+	function addToWishMultipleList() {
+	
+	
+	<?php if (!$this->customer->isLogged()) {?>
+	$.colorbox({ width:"50%", inline:true, href:"#inline-content-3"});
+	$.ajax({
+		url: 'index.php?route=account/wishlist/add',
+		type: 'post',
+				data: $('.product-info input[type=\'text\'], .product-info input[type=\'hidden\'], .product-info input[type=\'radio\']:checked, .product-info input[type=\'checkbox\']:checked, .product-info select, .product-info textarea'),
+
+		dataType: 'json',
+		success: function(json) {
+			$('.success, .warning, .attention, .information').remove();
+						
+			if (json['success']) {
+				
+				$('#wishlist-total').html(json['total']);	
+                 $('#wishlistlogin').html(json['success']);		
+				 createTemporaryList();
+	
+				
+			}	
+		}
+	});
+	<?php }else{?>
+	$.colorbox({ width:"30%", inline:true, href:"#inline-content-3"});
+	$.ajax({
+		url: 'index.php?route=account/wishlist/add',
+		type: 'post',
+				data: $('.product-info input[type=\'text\'], .product-info input[type=\'hidden\'], .product-info input[type=\'radio\']:checked, .product-info input[type=\'checkbox\']:checked, .product-info select, .product-info textarea'),
+
+		dataType: 'json',
+		success: function(json) {
+			$('.success, .warning, .attention, .information').remove();
+						
+			if (json['success']) {
+				
+				$('#wishlist-total').html(json['total']);	
+	
+				
+			}	
+		}
+	});
+	<?php }?>
+}
+//--></script> 
+]]></add>
+		</operation>
+	</file>
+	<file name="catalog/controller/product/product.php">
+		<operation>
+			<search position="after"><![CDATA[
+				public function index() { 
+			]]>
+			</search>
+			<add><![CDATA[
+						$this->language->load('account/wishlist');
+						$this->data['cat_name'] = $this->language->get('cat_name');
+		$this->data['sort'] = $this->language->get('sort');
+		$this->data['new_list'] = $this->language->get('new_list');
+		$this->data['save_list_to'] = $this->language->get('save_list_to');
+		$this->data['save_list'] = $this->language->get('save_list');
+		$this->data['save_cat'] = $this->language->get('save_cat');
+		$this->data['list_title'] = $this->language->get('list_name');
+		$this->data['remove_list'] = $this->language->get('remove_list');
+		$this->data['noavailable_list'] = $this->language->get('noavailable_list');
+		$this->data['wishlists'] = $this->language->get('wishlists');
+		$this->data['remove'] = $this->language->get('remove');
+		$this->data['nocats'] = $this->language->get('nocats');
+		$this->data['nowishlists'] = $this->language->get('nowishlists');
+		$this->data['new_cat'] = $this->language->get('new_cat');
+		$this->data['nocats2'] = $this->language->get('nocats2');
+		$this->data['nowishlists2'] = $this->language->get('nowishlists2');
+		$this->data['choose'] = $this->language->get('choose');
+		$this->data['queuelist'] = $this->language->get('queuelist');
+		$this->data['createsave'] = $this->language->get('createsave');
+		$this->data['currently'] = $this->language->get('currently');
+		$this->data['empty'] = $this->language->get('empty');
+		$this->data['doso'] = $this->language->get('doso');
+		$this->data['or'] = $this->language->get('or');
+					 if (isset($this->session->data['success'])) {
+			$this->data['success'] = $this->session->data['success'];
+			unset($this->session->data['success']);
+		} else {
+			$this->data['success'] = '';
+		}	
+	//gather categories
+			$this->data['listcategories'] = array();
+			$list_count = $this->db->query("SELECT list_contents  FROM `" . DB_PREFIX . "wishlist_multiple` WHERE customer_id = '".(int)$this->customer->getId()."'");
+				if(!$list_count->num_rows){
+				  $this->data['list_count'] = false;
+				}else{
+				 $this->data['list_count'] = true;
+				}
+			$wishcategories = $this->db->query("SELECT category_id,category_name FROM `" . DB_PREFIX . "wishlist_categories` WHERE customer_id = '".(int)$this->customer->getId()."' ORDER BY sort_order ASC");
+			if(!$wishcategories ){
+				$this->data['listcategories'] = false;
+			}else{
+			$wishlists = array();
+			
+				foreach($wishcategories->rows as $cat){
+				$lists = $this->db->query("SELECT list_name,list_id FROM `" . DB_PREFIX . "wishlist_multiple` WHERE	list_category_id = '".(int)$cat['category_id']."' AND customer_id = '".(int)$this->customer->getId()."' ORDER BY list_id ASC");
+				$list_count = $this->db->query("SELECT COUNT(*) AS total FROM `" . DB_PREFIX . "wishlist_multiple` WHERE list_category_id = '".(int)$cat['category_id']."'");
+	            $count = $list_count->row['total'];
+				if($lists){
+				$wishlists = $lists->rows;
+				}else{
+				$wishlists = array();
+				}
+					$this->data['listcategories'][] = array('category_id' => $cat['category_id'],'category_name' => $cat['category_name'],'lists' => $wishlists,'count' => $count);
+					
+				}
+				
+			}				
+		
+		]]></add>
+
+		</operation>
+		<operation>
+			<search position="before"><![CDATA[
+$this->document->setTitle($product_info['name']);
+            ]]></search>
+			<add><![CDATA[
+			$url = '';
+		$this->data['catpath'] = $this->url->link('product/product', $url . '&product_id=' . $this->request->get['product_id']);
+		
+            ]]></add>
+		</operation>
+	</file>
+	<file name="catalog/language/*/account/wishlist.php">
+		<operation>
+			<search position="before"><![CDATA[$_['heading_title']]]></search>
+			<add><![CDATA[
+						$_['heading_title_new'] = 'My Wish Lists';
+						]]></add>
+		</operation>
+		<operation>
+			<search position="after"><![CDATA[$_['heading_title']]]></search>
+			<add><![CDATA[
+						
+						
+						
+	
+	
+$_['text_share_my_list']  = 'Share';
+$_['text_print_my_list']  = 'Print';
+$_['text_clear_my_list']  = 'Clear List';
+$_['text_form_your_name']  = 'Your Name:';
+$_['text_form_recipient_name']  = 'Recipients Name:';
+$_['text_form_email']  = 'Recipients Email:';
+$_['text_form_message']  = 'Message:';
+$_['text_form_send']  = 'Send List';
+$_['text_form_close']  = 'Close';
+$_['column_addremove']  = 'Action';
+$_['column_share']  = 'Share';
+$_['column_quantity']  = 'Quantity';
+$_['new_cat']  = 'New Group';
+$_['cat_name']  = 'Group Name:';
+$_['sort']  = 'Sort Order:';
+$_['new_list']  = 'New List';
+$_['save_list_to']  = 'Save list to:';
+$_['save_list']  = 'Save list';
+$_['save_cat']  = 'Save Group';
+$_['list_name']  = 'List Name:';
+$_['remove_list']  = 'Remove List';
+$_['noavailable_list']  = 'No available lists';
+$_['wishlists']  = 'Wishlists';
+$_['remove']  = 'Remove  Group';
+$_['rename']  = 'Rename Group';
+$_['nocats']  = 'You currently have 0 wish list groups. You can create unlimited groups by clicking NEW GROUP.';
+$_['nowishlists']  = 'You currently have 0 wish lists. Please create one or more and assign it to a category.';
+$_['nocats2']  = 'You currently have 0 wish list groups. Please create one or more and then create lists to go in those groups.';
+$_['nowishlists2']  = 'You currently have 0 wish lists. Please create one or more and assign it to a category.';
+$_['choose']  = 'Choose A List';
+$_['queuelist']  = 'You currently have items in queue that need to be assigned to a wishlist. Please do that now.';
+$_['createsave']  = 'Create/Save A List';
+$_['currently']  = 'Currently showing';
+$_['empty']  = 'This list is currently empty ';
+$_['doso']  = 'Your item + options have been saved until you do so.';
+$_['or']  = '- OR -';
+
+
+
+
+
+
+]]></add>
+		</operation>
+	</file>
+	<file name="catalog/view/theme/*/template/account/wishlist.tpl">
+
+		<operation>
+			<search position="after">
+				<![CDATA[<div id="content" class="<?php echo $class; ?>"><?php echo $content_top; ?>]]></search>
+			<add><![CDATA[
+            <script>
+            $(document).ready(function() {
+
+
+});
+            </script>
+						   <form action="" method="post" enctype="multipart/form-data" id="form">
+						 <div class="left" style="padding-bottom:10px;">
+						 <a onClick="newCat();"  class="btn btn-primary"><?php echo $new_cat;?></a>
+						 <a onClick="newList();"  class="btn btn-primary"><?php echo $new_list;?></a>
+						 <a onClick="removeList(<?php if(isset($_GET['list_id'])){ echo $_GET['list_id']; }else{ echo $id;}?>);" class = "btn btn-primary"><?php echo $remove_list; ?></a>
+						 <a onClick="clearList(<?php if(isset($_GET['list_id'])){ echo $_GET['list_id']; }else{ echo $id;}?>);" class = "btn btn-primary"><?php echo $text_clear_my_list; ?></a>
+						  <a onClick="renameList(<?php if(isset($_GET['list_id'])){ echo $_GET['list_id']; }else{ echo $id;}?>);" class = "list-rename btn btn-primary">Rename List</a>
+						 <a id="sendlist" class ="btn btn-primary"><?php echo $text_share_my_list; ?></a>
+						 <a href="<?php echo $print;?>" target="_blank" class="btn btn-primary"><?php echo $text_print_my_list; ?></a>
+						
+						 </div></form>
+						  <div id="cat-title">Wishlist Groups</div>
+						  <div style="clear:left;"></div>
+						  <div id="cat-bar"> 
+						 <div id="multiple">
+						 <?php if($categories){?>
+						 <?php foreach($categories as $category){?>
+						 <div><select id = "list1_<?php echo $category['category_id'];?>" name = "<?php echo $category['category_id'];?>" onChange="listcontrol('<?php echo $category['category_id'];?>','<?php echo $category['category_name'];?>');">
+						 <option value="" selected><?php echo $category['category_name'];?> (<?php echo $category['count'];?>)</option>
+						  
+						 <optgroup label="<?php if($category['count'] == 0){ echo $noavailable_list; }else{ echo $wishlists;}?>">
+						 <?php if($category['lists']){?>
+						 <?php foreach($category['lists'] as $list){?>
+						  <option value="<?php echo $list['list_id'];?>"><?php echo $list['list_name'];?></option>
+						   <?php }?>
+						 <?php }?>
+						  </optgroup>
+						  <optgroup label = "Actions">
+						  <option value="remove"><?php echo $remove; ?></option>
+						   <option value="rename"><?php echo $rename; ?></option>
+						  
+						  </optgroup>
+						 </select></div>
+						  <?php }?>
+						 <?php }else{?>
+						<p style="color:#900;"> <?php echo $nocats;?></p>
+						 
+						 <?php }?>
+						
+						 </div>
+						  <div style="clear:left;"></div>
+						 </div>
+						 
+						  <div>  <?php if(!$list_count){?>
+						<p style="color:#900;">   <?php echo $nowishlists;?> </p>
+						
+						 <?php }?></div>
+
+			<div id="inline-content-newlist" class="mfp-hide" style="position: relative;
+  background: #FFF;
+  padding: 40px;
+  width: auto;
+  max-width: 450px;
+  margin: 20px auto;
+  text-align: center;">
+			<div id="list-info">
+			<h2><?php echo $new_list;?></h2>
+			
+			<?php if(!$categories){?>
+						<p style="color:#900;"> <?php echo $nocats;?></p>
+						 <?php }else{?>
+						 
+						<?php echo $list_title;?> <input type="text" name="name" value="" /><br><br>
+			           <?php echo $save_list_to;?><br>
+			 <?php foreach($categories as $category){?>
+						  <input type="radio" name="categoryname" id="cat1_<?php echo $category['category_name'];?>" value="<?php echo $category['category_id'];?>">	<label for="cat1_<?php echo $category['category_name'];?>"><?php echo $category['category_name'];?></label><br><br>
+						   <?php }?>
+						 <a onClick="savenewlist();" class="btn btn-primary"> <?php echo $save_list;?></a>
+						 <?php }?>
+			
+			
+			</div>
+</div>
+
+						<div id="inline-content-newcat" class="mfp-hide" style="position: relative;
+  background: #FFF;
+  padding: 40px;
+  width: auto;
+  max-width: 450px;
+  margin: 20px auto;
+  text-align: center;">
+			<div id="category-info">
+			<h2><?php echo $new_cat;?></h2>
+			<?php echo $cat_name;?>: <input type="text" name="name" value="" /><br><br>
+			<?php echo $sort;?> <input type="text" name="sort" size="2" value="" /><br><br>
+			
+			<a onClick="savenewcategory();" class="btn btn-primary"><?php echo $save_cat;?></a>
+			</div>
+			
+</div>
+ <div style='display:none'>
+<div id='inline-content-4' style='padding:10px; background:#fff;height:200px;overflow:auto;'>
+              <h2>Rename Category</h2>
+			<div id="rename">
+			
+			Name:<input type="text" name="catname" id="catname" value="" /><br><br>
+			 <a onClick="editCategoryName();" class="btn btn-primary">Submit</a>
+			 <input type="hidden" value="" name="changecatnameid" id="changecatnameid" />
+			</div>
+			
+			
+			</div></div>
+
+			<div id="inline-content-rename" class="mfp-hide" style="position: relative;
+  background: #FFF;
+  padding: 40px;
+  width: auto;
+  max-width: 350px;
+  margin: 20px auto;
+  text-align: center;">
+              <h2>Rename List</h2>
+			<div id="rename">
+			
+			Name:<input type="text" name="list-name" id="list-name" value="" /><br><br>
+			 <a onClick="editListName();" class="btn btn-primary">Submit</a>
+			 <input type="hidden" value="" name="changelistnameid" id="changelistnameid" />
+			</div>
+			
+			
+			</div>
+<div style='display:none'>
+<div id='inline-content-6' style='padding:10px; background:#fff;height:400px;overflow:auto;'>
+
+<h2>Wish List Import</h2>
+<p>The system has detected existing wish list items from your old wish list. If you would like to assign these items to a current list please do so now. If you would not like to import these items, choose no. <span style="color:#900;">This cannot be undone.</span></p>
+<p> <a onClick="destroyList();" class="btn btn-primary">Destroy these items and do not import</a></p>
+<?php if($oldproducts){?>
+<div style="float:left; margin-right:50px;">
+
+ <h2>Old Wish List Items</h2>
+<?php foreach($oldproducts as $product){?>
+<strong>Item:</strong> <?php echo $product['name'].'<br>';?>
+<?php }?>
+</div>
+
+<div style="float:left;margin-right:20px;">
+
+<?php if($categories){?>
+
+						 <h2>Assign To A New List</h2>
+						 
+						 <?php foreach($categories as $category){?>
+						<select id = "list6_<?php echo $category['category_id'];?>" name = "<?php echo $category['category_id'];?>" onChange="assignOldList(<?php echo $category['category_id'];?>);">
+						 <option value="" selected><?php echo $category['category_name'];?> (<?php echo $category['count'];?>)</option>
+						 
+						 <optgroup label="<?php if($category['count'] == 0){ echo "No available lists"; }else{ echo "Wish Lists";}?>">
+						 <?php if($category['lists']){?>
+						 <?php foreach($category['lists'] as $list){?>
+						  <option value="<?php echo $list['list_id'];?>"><?php echo $list['list_name'];?></option>
+						   <?php }?>
+						 <?php }?>
+						  </optgroup>
+						 </select><br><br>
+						  <?php }?>
+						 
+						
+						  </div>
+						  <div style="float:left; margin-right:20px;">- OR -</div>
+						  <div style="float:left;">
+						  <h2><?php echo $createsave;?></h2>
+						<?php echo $list_title;?> <input type="text" name="name_6" value="" /><br><br>
+			           <?php echo $save_list_to;?><br>
+			 <?php foreach($categories as $category){?>
+						  <input type="radio" name="categoryname_6" id="cat6_<?php echo $category['category_name'];?>" value="<?php echo $category['category_id'];?>">	<label for="cat6_<?php echo $category['category_name'];?>"><?php echo $category['category_name'];?></label><br><br>
+						   <?php }?>
+						 <a onClick="saveoldlistPlusAssign();" class="btn btn-primary"><?php echo $save_list;?></a>
+						</div>
+						
+						  <div style="clear:left;"> 
+						   <?php if(!$list_count){?>
+						<p style="color:#900;">   <?php echo $nowishlists2;?> </p>
+						
+						 <?php }?>
+						 </div>
+						   <?php }else{?>
+						<p style="color:#900;"><?php echo $nocats2;?> </p>
+						
+						 <?php }?>
+<?php }else{?>
+There are no items in the old wish list to import!
+<?php }?>
+
+
+</div>
+</div>
+<div style='display:none'>
+<div id='inline-content-8' style='padding:10px; background:#fff;height:400px;overflow:auto;'>
+<h2>Move Item</h2>
+<p><b>Choose a list to move this item to</b></p>
+<p>Delete item from current list <input type="checkbox" value="1" checked name="deleteFromList" id="deleteFromList"></p>
+<?php if($categories){?>
+						 
+						 <?php foreach($categories as $category){?>
+						<select id = "list8_<?php echo $category['category_id'];?>" name = "<?php echo $category['category_id'];?>" onChange="assignToNewList(<?php echo $category['category_id'];?>);">
+						 <option value="" selected><?php echo $category['category_name'];?> (<?php echo $category['count'];?>)</option>
+						 
+						 <optgroup label="<?php if($category['count'] == 0){ echo "No available lists"; }else{ echo "Wish Lists";}?>">
+						 <?php if($category['lists']){?>
+						 <?php foreach($category['lists'] as $list){?>
+						  <option value="<?php echo $list['list_id'];?>"><?php echo $list['list_name'];?></option>
+						   <?php }?>
+						 <?php }?>
+						  </optgroup>
+						 </select>
+						 <br><br>
+						  <?php }?>
+						   <?php }else{?>
+						<p style="color:#900;">   <?php echo $nocats2;?> </p>
+						
+						 <?php }?>
+
+</div>
+</div>
+
+ <div style='display:none'>
+<div id='inline-content-3' style='padding:10px; background:#fff;height:400px;overflow:auto;'>
+              
+			<div id="choose">
+			<div style="float:left; margin-right:20px;">
+			<h2><?php echo $choose;?></h2>
+			<p style="width:300px;"><?php echo $queuelist;?></p>
+			
+						 <?php if($categories){?>
+						 
+						 <?php foreach($categories as $category){?>
+						<select id = "list2_<?php echo $category['category_id'];?>" name = "<?php echo $category['category_id'];?>" onChange="assignList(<?php echo $category['category_id'];?>);">
+						 <option value="" selected><?php echo $category['category_name'];?> (<?php echo $category['count'];?>)</option>
+						 
+						 <optgroup label="<?php if($category['count'] == 0){ echo "No available lists"; }else{ echo "Wish Lists";}?>">
+						 <?php if($category['lists']){?>
+						 <?php foreach($category['lists'] as $list){?>
+						  <option value="<?php echo $list['list_id'];?>"><?php echo $list['list_name'];?></option>
+						   <?php }?>
+						 <?php }?>
+						  </optgroup>
+						 </select><br><br>
+						  <?php }?>
+						  </div>
+						<div style="float:left; margin-right:20px;">- OR -</div><div style="float:left;">
+						  <h2><?php echo $createsave;?></h2>
+						<?php echo $list_title;?> <input type="text" name="name" value="" /><br><br>
+			           <?php echo $save_list_to;?><br>
+			 <?php foreach($categories as $category){?>
+						  <input type="radio" name="categoryname" id="cat1_<?php echo $category['category_name'];?>" value="<?php echo $category['category_id'];?>">	<label for="cat1_<?php echo $category['category_name'];?>"><?php echo $category['category_name'];?></label><br><br>
+						   <?php }?>
+						 <a onClick="savenewlistPlusAssign();" class="btn btn-primary"><?php echo $save_list;?></a>
+						</div>
+						 <?php }else{?>
+						<p style="color:#900;">   <?php echo $nocats2;?> </p>
+						
+						 <?php }?>
+						  <div style="clear:left;">  <?php if(!$list_count){?>
+						<p style="color:#900;">   <?php echo $nowishlists2;?> </p>
+						
+						 <?php }?></div>
+			
+			</div>
+</div></div>	
+        <?php if($list_name){?> <p style="color:#090;"><?php echo $currently;?><br> Group: <i><b><?php echo $category_name;?></b></i> -- List: <i><b><?php echo $list_name;?></b></i></p><?php }?> <?php if($listempty && $list_name){?><p style="color: #900;"><?php echo $empty;?> </p><?php }?>
+
+  <div id="send-list">			
+            
+			<table>
+            <tr>
+            <td align="right"><?php echo $text_form_your_name; ?></td> <td><input name="yourname" id="yourname" type="text" value="<?php echo $firstname;?>" size="35" maxlength="100" /></td>
+            </tr>
+			<tr>
+             <td align="right"><?php echo $text_form_recipient_name; ?></td> <td><input name="recipientsname" id="recipientsname" type="text" value="" size="35" maxlength="100" /></td>
+              </tr>
+			  <tr>
+             <td align="right"><span class="required">*</span><?php echo $text_form_email; ?></td> <td><input name="email" id="email" type="text" value="" size="35" maxlength="100" /></td>
+              </tr>
+              <td align="right"><?php echo $text_form_message; ?></td> <td><textarea cols="36"rows="4" name="message" id="message" wrap="hard"></textarea></td>
+            </tr>
+            <tr><td>&nbsp;</td><td><a id="send-items" class ="btn btn-primary"><?php echo $text_form_send; ?></a> <a id="close" class ="btn btn-primary"><?php echo $text_form_close; ?></a></td></tr>
+            </table>
+            </div>
+ 
+]]></add>
+		</operation>
+		<operation>
+			<search position="before"><![CDATA[<?php echo $footer; ?>]]></search>
+			<add><![CDATA[
+							<script>
+						  <?php if($queue && !$oldwish){?>
+						$(document).ready(function() {	
+						$.colorbox({ width:"50%", inline:true, href:"#inline-content-3"});
+						
+						}); 
+						<?php }?>
+						 <?php if($oldwish){?>
+						$(document).ready(function() {	
+						$.colorbox({ width:"50%", inline:true, href:"#inline-content-6"});
+						
+						}); 
+						<?php }?>
+						</script>
+						<script type="text/javascript"><!--
+						
+						$("#inline-list1").colorbox({inline:true, width:"20%"});
+
+$(document).ready(function() {
+	$('.colorbox').colorbox({
+		overlayClose: true,
+		opacity: 0.5,
+		rel: "colorbox"
+	});
+});
+function destroyList(){
+			
+				$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/destroyOldList',	
+		dataType: 'json',
+		beforeSend: function() {
+			$('#inline-content-6').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+				
+					
+		   }
+		}
+	});	
+		
+			}
+function assignOldList(catid){
+			
+				$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/assignToOldList&listid='+$('#list6_'+catid).val(),	
+		dataType: 'json',
+		beforeSend: function() {
+			$('#list6_'+catid).before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+				
+					
+		   }
+		}
+	});	
+		
+			}
+function saveoldlistPlusAssign(){
+			$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/addOldListAndAssign',
+		data: $('#inline-content-6 input[type=\'text\'],#inline-content-6 input[type=\'radio\']:checked'),
+		dataType: 'json',
+		beforeSend: function() {
+			$('#inline-content-6').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+				location = json['success'];
+		
+					
+		   }
+		}
+	});	
+		
+		}	
+function editListName(){
+
+$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/editListName',	
+		dataType: 'json',
+		data: $('#rename input[type=\'text\'],#rename input[type=\'hidden\']'),
+		beforeSend: function() {
+			$('#rename').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+				
+					
+		   }
+		}
+	});	
+}
+function editCategoryName(){
+
+$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/editCategoryName',	
+		dataType: 'json',
+		data: $('#rename input[type=\'text\'],#rename input[type=\'hidden\']'),
+		beforeSend: function() {
+			$('#rename').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+				
+					
+		   }
+		}
+	});	
+}
+function assignToNewList(catid){
+			
+				$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/assignToNewList&deleteold=' + encodeURIComponent($('input[name=\'deleteFromList\']').attr('checked') ? 1 : 0)+ '&productid='+globalpid+'&oldlistid='+globallistid+'&newlistid='+$('#list8_'+catid).val(),	
+		dataType: 'json',
+		beforeSend: function() {
+			$('#list8_'+catid).before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+				
+					
+		   }
+		}
+	});	
+		
+			}
+function assignList(catid){
+			
+				$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/assignToList&listid='+$('#list2_'+catid).val(),	
+		dataType: 'json',
+		beforeSend: function() {
+			$('#list2_'+catid).before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+				
+					
+		   }
+		}
+	});	
+		
+			}
+			function removeList(listid){
+			 if (!confirm ('Warning: This will delete the entire list from this category. Continue?')) {
+                return false;
+            
+        }else{
+				$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/removeList&listid='+listid,	
+		dataType: 'json',
+		beforeSend: function() {
+			$('.left').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+				
+					
+		   }
+		}
+	});	
+	}
+		
+			}
+			function clearList(listid){
+			 if (!confirm ('Warning: This will clear the current list. Are you sure you wish to do this?')) {
+                return false;
+            
+        }else{
+				$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/clearList&listid='+listid,	
+		dataType: 'json',
+		beforeSend: function() {
+			$('.left').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+				
+					
+		   }
+		}
+	});	
+	}
+		
+			}
+			
+			
+			function savenewlistPlusAssign(){
+			$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/addNewListAndAssign',
+		data: $('#choose input[type=\'text\'],#choose input[type=\'radio\']:checked'),
+		dataType: 'json',
+		beforeSend: function() {
+			$('#choose').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+				location = json['success'];
+		
+					
+		   }
+		}
+	});	
+		
+		}		
+			function savenewcategory(){
+			$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/addNewCategory',
+		data: $('#category-info input[type=\'text\']'),
+		dataType: 'json',
+		beforeSend: function() {
+			$('#category-info').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+					
+		   }
+		}
+	});	
+		
+		}
+
+
+function newList(){
+
+$.magnificPopup.open({
+  items: {
+    src: '#inline-content-newlist',
+    type: 'inline'
+  }
+});
+		}
+
+		function newCat(){
+
+$.magnificPopup.open({
+  items: {
+    src: '#inline-content-newcat',
+    type: 'inline'
+  }
+});
+		}
+		function renameList(listid){
+
+ $.magnificPopup.open({
+  items: {
+    src: '#inline-content-rename',
+    type: 'inline'
+  }
+});
+
+		 $('#list-name').val(listname);
+		 //$('#changelistnameid').val(listid);
+		}
+		function listcontrol(catid,catname){
+			//check for remove category first
+		if($('#list1_'+catid).val() == "remove"){
+		 if (!confirm ('Warning: This will remove the category along with all of the wishlists that belong to it. Are you sure?')) {
+                return false;
+        
+        }else{
+		
+			$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/removeCategory&catid='+catid,	
+		dataType: 'json',
+		beforeSend: function() {
+			$('#list1_'+catid).before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+					
+		   }
+		}
+	});	
+	}
+		 }else if($('#list1_'+catid).val() == "rename"){   
+		 $('#catname').val(catname);
+		 $('#changecatnameid').val(catid);
+		 
+		 $.colorbox({ width:"30%", inline:true, href:"#inline-content-4"});
+		 
+		 }else{
+		//load list chosen
+		
+			$.ajax({
+		type: 'POST',
+	url: 'index.php?route=wishlist/shared_wishlist/loadList&listid='+$('#list1_'+catid).val(),	
+		dataType: 'json',
+		beforeSend: function() {
+			$('#list1_'+catid).before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+					
+		   }
+		}
+	});	
+		}
+	}			
+		function savenewlist(){
+			$.ajax({
+		type: 'POST',
+		url: 'index.php?route=wishlist/shared_wishlist/addNewList',
+		data: $('#inline-content-newlist input[type=\'text\'],#inline-content-newlist input[type=\'radio\']:checked'),
+		dataType: 'json',
+		beforeSend: function() {
+			$('#list-info').before('<span class="wait">&nbsp;<img src="catalog/view/theme/default/image/loading.gif" alt="" /></span>');
+		},
+		complete: function() {
+			$('.wait').remove();
+		},
+		success: function(json) {
+		
+		
+			if (json['error']) {
+				alert(json['error']);
+			}
+			if (json['success']) {
+			
+			location = json['success'];
+					
+		   }
+		}
+	});	
+		
+		}		
+	$('#send-items').bind('click', function() {	
+
+
+	$.ajax({
+		url: 'index.php?route=wishlist/shared_wishlist/sendList&link=' + encodeURIComponent('<?php echo $share_link; ?>'),	
+		type: 'POST',
+		data: $('#send-list input[type=\'text\'], #send-list textarea'),
+		dataType: 'json',
+		beforeSend: function() {
+			
+			$('#send-list').after('<div class="wait"><img src="catalog/view/theme/default/image/loading.gif" alt="" />'+'sending....'+'</div>');
+		},
+		success: function(json) {	
+		$( ".wait" ).remove();
+		$( ".error" ).remove();
+		$( ".success" ).remove();
+		 	if (json['error']['email']) {
+					$('#send-list input[name=\'email\']').after('<span class="error">' + json['error']['email'] + '</span>');					
+		
+			}else{
+				
+				if(json['error']['success']){
+					$( ".wait" ).remove();
+					$( ".error" ).remove();
+					$( ".success" ).remove();
+				  var selectedEffect1 = "blind";
+		             var options = {};
+					  if($("#send-list").is(":visible")){  
+				
+			  
+			  $( "#yourname" ).val('');
+			  $( "#recipientsname" ).val('');
+			  $( "#email" ).val('');
+			  $( "#message" ).val('');
+			         
+				 $( "#send-list" ).hide( selectedEffect1, options, 500);
+				 $('.breadcrumb').before('<div class="success">' + json['error']['success'] + '<img src="catalog/view/theme/default/image/close.png" alt="" class="close" /></div>');
+					  }
+				}
+				
+			}
+		}
+	});
+});
+	$('#sendlist').bind('click', function() {
+		
+	    var selectedEffect1 = "blind";
+		 var options = {};
+		 if($("#send-list").is(":visible")){         
+		 $( "#send-list" ).hide( selectedEffect1, options, 500);
+		
+		}else{
+			
+			 $( "#send-list" ).show( selectedEffect1, options, 500);
+			 //$('html, body').animate({ scrollTop: 550 }, 'slow'); 
+		
+			
+		}
+		});
+		$('#close').bind('click', function() {
+		
+	    var selectedEffect1 = "blind";
+		 var options = {};
+		 if($("#send-list").is(":visible")){         
+		 $( "#send-list" ).hide( selectedEffect1, options, 500);
+		
+		
+			
+		}
+		});
+			function moveItem(product_id,list_id){
+			globalpid = product_id;
+			globallistid = list_id;
+			 $.colorbox({ width:"30%", inline:true, href:"#inline-content-8"});
+			}
+		function addToCartWish(product_id,list_id,quantity,mainkey){
+$.ajax({
+		url: 'index.php?route=wishlist/shared_wishlist/addToCart&quantity='+quantity+'&product_id='+product_id+'&list_id='+list_id+'&mainkey='+mainkey,
+		type: 'post',		
+		dataType: 'json',
+		success: function(json) {
+	
+			$('.success, .warning, .attention, .information, .error').remove();
+			
+			if (json['redirect']) {
+				location = json['redirect'];
+			}
+			
+			if (json['error']) {
+				if (json['error']['warning']) {
+					$('#notification').html('<div class="warning" style="display: none;">' + json['error']['warning'] + '<img src="catalog/view/theme/default/image/close.png" alt="" class="close" /></div>');
+					
+					$('.warning').fadeIn('slow');
+					
+					$('html, body').animate({ scrollTop: 0 }, 'slow');
+				}
+			}	 
+						
+			if (json['success']) {
+				$('#notification').html('<div class="success" style="display: none;">' + json['success'] + '<img src="catalog/view/theme/default/image/close.png" alt="" class="close" /></div>');
+				
+				$('.success').fadeIn('slow');
+				
+				$('#cart_total').html(json['total']);
+				
+				$('html, body').animate({ scrollTop: 0 }, 'slow'); 
+			}	
+		}
+	});
+	
+}
+		//--></script> 
+	
+]]></add>
+		</operation>
+		<operation>
+			<search position="before" index="1">
+				<![CDATA[<td class="text-right"><?php echo $column_action; ?></td>]]></search>
+			<add><![CDATA[
+            <td class="text-center"><?php echo $column_quantity;?></td>
+            <td class="text-center"><?php echo $column_share; ?></td>
+	
+]]></add>
+		</operation>
+
+
+		<operation>
+			<search position="before" index="2">
+				<![CDATA[<td class="text-right"><?php echo $column_action; ?></td>]]></search>
+			<add><![CDATA[<td class="text-center"><?php echo $product['quantity'];?></td><td class="text-center"><a class="addthis_button_facebook"
+       addthis:url="<?php echo HTTP_SERVER;?>index.php?route=product/product&product_id=<?php echo $product['product_id'];?>"
+       addthis:title="<?php echo $product['name']; ?>"
+       addthis:description="<?php echo $product['name']; ?>"></a> <br><a class="addthis_button_twitter"
+       addthis:url="<?php echo HTTP_SERVER;?>index.php?route=product/product&product_id=<?php echo $product['product_id'];?>"
+       addthis:title="<?php echo $product['name']; ?>"
+       addthis:description="<?php echo $product['name']; ?>"></a> </td>
+	
+]]></add>
+		</operation>
+
+		<operation>
+			<search position="replace"><![CDATA[<?php echo $product['remove']; ?>]]></search>
+			<add><![CDATA[
+				
+	<?php echo $product['removeitem']; ?>
+]]></add>
+		</operation>
+
+
+	</file>
+
+</modification>
